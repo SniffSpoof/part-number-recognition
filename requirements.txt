@@ -1,0 +1,4 @@
+google-generativeai
+tensorflow
+pytelegrambotapi
+fake-useragent
