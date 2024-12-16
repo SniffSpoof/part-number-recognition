@@ -2,3 +2,4 @@ google-generativeai
 tensorflow
 pytelegrambotapi
 fake-useragent
+python-telegram-bot
