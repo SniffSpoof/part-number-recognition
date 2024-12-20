@@ -62,9 +62,8 @@ def show_last_log_lines(page_offset, n=10):
 
 # Function to start a script and save the reference to the process
 def run_script(args, process_dict, links):
-    link_args = get_part(links, N, args["page_offset"])
+    link_args = get_part(links, N, int(args["page_offset"]))
 
-    # include the --links argument
     command = [
         "python", "main.py",
         "--model", args["model"],
@@ -73,6 +72,7 @@ def run_script(args, process_dict, links):
         "--gemini-api-model", args["gemini_api_model"],
         "--prompt", args["prompt"],
         "--car-brand", args["car_brand"],
+        "--page-offset", args["page_offset"],
         "--links", *link_args
     ]
 
@@ -83,7 +83,7 @@ def run_script(args, process_dict, links):
       stderr=subprocess.DEVNULL
     )
 
-    process_dict[args["page_offset"]] = {"process": process, "paused": False}
+    process_dict[int(args["page_offset"])] = {"process": process, "paused": False}
     print(f"Process {args['page_offset']} started with PID: {process.pid}")
 
 
@@ -106,7 +106,7 @@ def main():
             "gemini_api_model": args.gemini_api_model,
             "prompt": args.prompt,
             "car_brand": args.car_brand,
-            "page_offset": i
+            "page_offset": str(i)
         }
         for i in range(N)  
     ]
