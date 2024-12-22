@@ -19,6 +19,8 @@ from telegram.ext import (
 
 N = 1 # Number of processes to start
 
+CHAT_ID = None
+
 process_dict = {}  # Dictionary to store process references
 
 
@@ -39,6 +41,7 @@ def parse_args():
     parser.add_argument('--page-offset', type=int, default=1, required=False, help="Number of threads to use (default is 1)")
     parser.add_argument('--links', nargs='+', default=None, required=False, help="List of pre-generated links to work with")
     parser.add_argument('--telegram-token', type=str, required=True, help="Your Telegram API token")
+    parser.add_argument('--chat-id', type=int, required=True, help="Your chat ID with bot. Use get_chat_id.py to define it")
     parser.add_argument('--car-brand', type=str, required=True, help="Car brand to use for prompts. Supported brands: audi, toyota, nissan, suzuki, honda, daihatsu, subaru, mazda, bmw, lexus, volkswagen, volvo, mini, fiat, citroen, renault, ford, isuzu, opel, mitsubishi, mercedes, jaguar, peugeot, porsche, alfa_romeo, chevrolet")
 
     args = parser.parse_args()
@@ -188,6 +191,13 @@ async def exit_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     os._exit(0)
 
 
+async def monitor_processes(context: ContextTypes.DEFAULT_TYPE):
+    if all(proc_info["process"].poll() is not None for proc_info in process_dict.values()):
+        print(context.job)
+        await context.bot.send_message(chat_id=CHAT_ID, text="All processes completed.")
+        context.job.schedule_removal() 
+
+
 if __name__ == "__main__":
 
     args = parse_args()
@@ -195,6 +205,8 @@ if __name__ == "__main__":
     keys = args.api_keys
 
     N = args.page_offset
+    
+    CHAT_ID = args.chat_id
 
     links = args.links or get_links(args.car_brand, args.max_steps, args.max_links, 0)
 
@@ -217,9 +229,8 @@ if __name__ == "__main__":
 
     nest_asyncio.apply()
     async def main():
-        application = ApplicationBuilder().token(args.telegram_token).build()
+        application = ApplicationBuilder().token(args.telegram_token).post_init(lambda app: app.job_queue).build()
 
-        # Добавляем обработчики команд
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("status", status))
@@ -229,10 +240,14 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("logs", logs))
         application.add_handler(CommandHandler("exit", exit_bot))
 
+        #print(args.chat_id)
+        job_queue = application.job_queue
+        job_queue.run_repeating(monitor_processes, interval=10, first=10)
+
         await application.initialize()
         print("Bot started. Use it via Telegram.")
         await application.start()
-        await application.updater.start_polling(drop_pending_updates=True)  # Очищаем старые обновления
+        await application.updater.start_polling(drop_pending_updates=True)  
         await asyncio.Future()  # Keep the program running
 
     asyncio.get_event_loop().run_until_complete(main())
