@@ -303,23 +303,17 @@ class GeminiInference():
     
     if car_brand == None:
         validation_prompt = self.prompts.get(self.car_brand, {}).get('validation_prompt', "")
-        incorrect_predictions_str = ", ".join(self.incorrect_predictions)
-        prompt = validation_prompt.format(extracted_number=extracted_number, incorrect_predictions=incorrect_predictions_str)
-
-        prompt_parts = [
-            image_parts[0],
-            prompt,
-        ]
         
     else:
         validation_prompt = self.prompts.get(car_brand, {}).get('validation_prompt', "")
-        incorrect_predictions_str = ", ".join(self.incorrect_predictions)
-        prompt = validation_prompt.format(extracted_number=extracted_number, incorrect_predictions=incorrect_predictions_str)
 
-        prompt_parts = [
-            image_parts[0],
-            prompt,
-        ]
+    incorrect_predictions_str = ", ".join(self.incorrect_predictions)
+    prompt = validation_prompt.format(extracted_number=extracted_number, incorrect_predictions=incorrect_predictions_str)
+
+    prompt_parts = [
+        image_parts[0],
+        prompt,
+    ]
     
     response = self.validator_model.generate_content(prompt_parts)
     
@@ -446,6 +440,9 @@ class GeminiInference():
     
     logging.info(f"Attempting to find another brand")
     identify_result = self.identify_brand(img_data)
+    if identify_result == "NONE":
+      logging.warning("All attempts failed. Returning NONE.")
+      return "NONE"
     answer = self.get_new_response(img_data, identify_result)
     extracted_number = self.extract_number(answer)
     
