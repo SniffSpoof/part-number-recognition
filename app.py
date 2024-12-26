@@ -37,9 +37,10 @@ def parse_args():
 
 def get_part(arr, k, i):
     part_size = len(arr) // k
+    remainder = len(arr) % k
 
-    start_index = i * part_size
-    end_index = (i + 1) * part_size
+    start_index = i * part_size + min(i, remainder)
+    end_index = start_index + part_size + (1 if i < remainder else 0)
 
     return arr[start_index:end_index]
 
