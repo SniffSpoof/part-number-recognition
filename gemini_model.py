@@ -320,6 +320,42 @@ class GeminiInference():
     logging.info(f"Validator model response: {response.text}")
     return response.text
 
+  def final_validate_number(self, extracted_number, img_data, predicted_number):
+    genai.configure(api_key=self.api_keys[self.current_key_index])
+      
+    formatted_number = self.format_part_number(extracted_number)
+      
+    image_parts = [
+        {
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": img_data.getvalue() if isinstance(img_data, io.BytesIO) else img_data.read_bytes()
+            }
+        },
+    ]
+      
+
+    prompt = [
+        f"Your task is to identify the number {predicted_number} on the provided image. ",
+        "Check carefully to see if you can find that exact number in the picture. There may be errors in the number - check each character",
+        "If you find the number clearly visible, return it as it is. ",
+        "If you cannot find the number, return 'NONE'. ",
+        f"If the sticker with the number is torn return '!{predicted_number}", 
+        "IF THE PHOTO QUALITY IS POOR, OR THE STICKER IS NOT CLEARLY VISIBLE (THE STICKER MUST OCCUPY A LARGE AREA OF THE PHOTO) YOU MUST RETURN 'NONE'",
+        "Respond strictly in the format: <START>your_response<END>."
+    ]
+    prompt = "".join(prompt)
+
+    prompt_parts = [
+        image_parts[0],
+        prompt,
+    ]
+      
+    response = self.validator_model.generate_content(prompt_parts)
+      
+    logging.info(f"Final Validator model response: {response.text}")
+    return response.text.split('<START>')[-1].split("<END>")[0].strip()
+
   def identify_brand(self, img_data):
     genai.configure(api_key=self.api_keys[self.current_key_index])
     
@@ -423,7 +459,8 @@ class GeminiInference():
         
         if extracted_number.upper() != "NONE":
             validation_result = self.validate_number(extracted_number, img_data)
-            if "<VALID>" in validation_result:
+            extracted_number = self.final_validate_number(extracted_number, img_data, extracted_number)
+            if "<VALID>" in validation_result and extracted_number != "NONE": #extracted_number may be "NONE" after final validation
                 logging.info(f"Valid number found: {extracted_number}")
                 self.reset_incorrect_predictions()
                 return extracted_number
@@ -437,7 +474,7 @@ class GeminiInference():
             if attempt < max_attempts - 1:
                 logging.info(f"Attempting to find another number (Attempt {attempt + 2}/{max_attempts})")
     
-    
+    '''
     logging.info(f"Attempting to find another brand")
     identify_result = self.identify_brand(img_data)
     if identify_result == "NONE":
@@ -456,7 +493,7 @@ class GeminiInference():
             return extracted_number
         else:
             logging.warning(f"Validation failed: {validation_result}")
-
+    '''
     self.reset_incorrect_predictions()
     logging.warning("All attempts failed. Returning NONE.")
     return "NONE"
