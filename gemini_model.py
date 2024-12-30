@@ -241,7 +241,7 @@ class GeminiInference():
             
             full_prompt = image_parts + prompt_parts
             
-            sleep(random.uniform(1, 3))
+            sleep(random.uniform(1, 5))
             
             chat = self.model.start_chat(history=self.message_history)
             response = chat.send_message(full_prompt)
@@ -342,6 +342,7 @@ class GeminiInference():
         "If you cannot find the number, return 'NONE'. ",
         f"If the sticker with the number is torn return '!{predicted_number}", 
         "IF THE PHOTO QUALITY IS POOR, OR THE STICKER IS NOT CLEARLY VISIBLE (THE STICKER MUST OCCUPY A LARGE AREA OF THE PHOTO) YOU MUST RETURN 'NONE'",
+        "Explanation: [Brief explanation of why it's valid or invalid, including the number itself and any concerns about it being upside-down]",
         "Respond strictly in the format: <START>your_response<END>."
     ]
     prompt = "".join(prompt)
@@ -465,7 +466,7 @@ class GeminiInference():
                 self.reset_incorrect_predictions()
                 return extracted_number
             else:
-                logging.warning(f"Validation failed: {validation_result}")
+                logging.warning(f"Validation failed")
                 self.incorrect_predictions.append(extracted_number)
                 if attempt < max_attempts - 1:
                     logging.info(f"Attempting to find another number (Attempt {attempt + 2}/{max_attempts})")
