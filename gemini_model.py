@@ -66,34 +66,6 @@ If there are multiple numbers in the image, please identify the one that is most
 - If no valid number is identified: `<START> NONE <END>`
 """
 
-IDENTIFICATION_PROMPT = """**Identify the brand of the automotive part based on the provided image using the following algorithm:**
-
-1. **Analyze the Visual and Textual Elements:**
-   - Examine the image for any visible text, symbols, or logos.
-   - Pay attention to specific areas where brand names, logos, or slogans are likely to appear, such as labels, embossed surfaces, or barcodes.
-
-2. **Compare with Known Brand Identifiers:**
-   - Cross-reference the text or symbols in the image with a list of known automotive brands.
-   - Examples of common identifiers include:
-     - **Audi**: Four interlocking rings or the slogan *Vorsprung durch Technik*.
-     - **Volkswagen (VW)**: "VW" logo or *Das Auto* slogan.
-     - **Škoda**: Winged arrow logo or *Simply Clever* slogan.
-     - **SEAT**: "SEAT" logo or mentions of *Barcelona*.
-
-3. **Handle Ambiguities:**
-   - If multiple potential brands are identified, prioritize the most prominent or frequent match.
-   - For unclear or generic cases, attempt to infer the brand based on visible text or context.
-
-4. **Response Formatting:**
-   - If a specific brand is identified, respond with: `<START>brand_name<END>` (e.g., `<START>Audi<END>`).
-   - If no clear brand is identifiable, respond with: `<START>NONE<END>`.
-
----
-
-### **Expected Response Format:**
-- Identified brand: `<START>brand_name<END>`
-- No brand identified: `<START>NONE<END>`
-"""
 
 class GeminiInference():
   def __init__(self, api_keys, model_name='gemini-1.5-flash', car_brand=None):
@@ -241,7 +213,7 @@ class GeminiInference():
             
             full_prompt = image_parts + prompt_parts
             
-            sleep(random.uniform(1, 5))
+            sleep(random.uniform(2, 6))
             
             chat = self.model.start_chat(history=self.message_history)
             response = chat.send_message(full_prompt)
@@ -340,6 +312,7 @@ class GeminiInference():
         "Check carefully to see if you can find that exact number in the picture. There may be errors in the number - check each character",
         "If you find the number clearly visible, return it as it is. ",
         "If you cannot find the number, return 'NONE'. ",
+        "All segments must be clearly defined\n   - No mixing of 'O' (letter) with '0' (number)\n   - No mixing of 'B' (letter) with '8' (number)\n   - No mixing of 'S' (letter) with '5' (number)\n   - No mixing of 'I' (letter) with '1' (number)",
         f"If the sticker with the number is torn return '!{predicted_number}", 
         "IF THE PHOTO QUALITY IS POOR, OR THE STICKER IS NOT CLEARLY VISIBLE (THE STICKER MUST OCCUPY A LARGE AREA OF THE PHOTO) YOU MUST RETURN 'NONE'",
         "Explanation: [Brief explanation of why it's valid or invalid, including the number itself and any concerns about it being upside-down]",
@@ -356,82 +329,6 @@ class GeminiInference():
       
     logging.info(f"Final Validator model response: {response.text}")
     return response.text.split('<START>')[-1].split("<END>")[0].strip()
-
-  def identify_brand(self, img_data):
-    genai.configure(api_key=self.api_keys[self.current_key_index])
-    
-    image_parts = [
-        {
-            "inline_data": {
-                "mime_type": "image/jpeg",
-                "data": img_data.getvalue() if isinstance(img_data, io.BytesIO) else img_data.read_bytes()
-            }
-        },
-    ]
-    
-    prompt = IDENTIFICATION_PROMPT
-    #incorrect_predictions_str = ", ".join(self.incorrect_predictions)
-    #prompt = validation_prompt.format(extracted_number=extracted_number, incorrect_predictions=incorrect_predictions_str)
-
-    prompt_parts = [
-        image_parts[0],
-        prompt,
-    ]
-    
-    response = self.identify_model.generate_content(prompt_parts)
-    
-    logging.info(f"Identify model response: {response.text}")
-    
-    brand = response.text.split('<START>')[-1].split("<END>")[0].strip()
-    if brand.upper() != "NONE":
-        return brand.lower()
-    else:
-        return "NONE"
-        
-  def get_new_response(self, img_data, car_brand):
-    max_retries = 10
-    base_delay = 5
-    
-    for attempt in range(max_retries):
-        try:
-            image_parts = [
-                {
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": img_data.getvalue() if isinstance(img_data, io.BytesIO) else img_data.read_bytes()
-                    }
-                },
-            ]
-            
-            prompt = self.prompts.get(car_brand, {}).get('main_prompt', DEFAULT_PROMPT)
-            
-            sleep(random.uniform(1, 3))
-            
-            prompt_parts = [
-              image_parts[0],
-              prompt,
-            ]
-    
-            response = self.identify_model.generate_content(prompt_parts)
-            
-            logging.info(f"Identify model response: {response.text}")
-            
-            return response.text
-            
-        except Exception as e:
-            if "quota" in str(e).lower():
-                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-                if delay > 300:
-                    self.switch_api_key()
-                    delay = base_delay
-                logging.warning(f"Rate limit reached. Attempt {attempt + 1}/{max_retries}. Retrying in {delay:.2f} seconds...")
-                time.sleep(delay)
-            else:
-                logging.error(f"Error in get_new_response: {str(e)}")
-                raise
-    
-    logging.error("Max retries reached. Unable to get a response.")
-    raise Exception("Max retries reached. Unable to get a response.")
 
   def reset_incorrect_predictions(self):
     self.incorrect_predictions = []
@@ -475,26 +372,6 @@ class GeminiInference():
             if attempt < max_attempts - 1:
                 logging.info(f"Attempting to find another number (Attempt {attempt + 2}/{max_attempts})")
     
-    '''
-    logging.info(f"Attempting to find another brand")
-    identify_result = self.identify_brand(img_data)
-    if identify_result == "NONE":
-      logging.warning("All attempts failed. Returning NONE.")
-      return "NONE"
-    answer = self.get_new_response(img_data, identify_result)
-    extracted_number = self.extract_number(answer)
-    
-    logging.info(f"Last attempt: Extracted number: {extracted_number}")
-    
-    if extracted_number.upper() != "NONE":
-        validation_result = self.validate_number(extracted_number, img_data, identify_result)
-        if "<VALID>" in validation_result:
-            logging.info(f"Valid number found: {extracted_number}")
-            self.reset_incorrect_predictions()
-            return extracted_number
-        else:
-            logging.warning(f"Validation failed: {validation_result}")
-    '''
     self.reset_incorrect_predictions()
     logging.warning("All attempts failed. Returning NONE.")
     return "NONE"
