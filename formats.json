@@ -1,0 +1,11 @@
+{
+  "toyota": {
+    "format":"5-5"
+  },
+  "lexus": {
+    "format":"5-5"
+  },
+  "nissan": {
+    "format": "5-5"
+  }
+}
