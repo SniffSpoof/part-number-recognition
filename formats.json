@@ -7,5 +7,8 @@
   },
   "nissan": {
     "format": "5-5"
+  },
+  "suzuki": {
+    "format": "5-5,5-4"
   }
 }
