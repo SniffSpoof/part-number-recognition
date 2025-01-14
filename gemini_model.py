@@ -73,6 +73,8 @@ class GeminiInference():
     self.current_key_index = 0
     self.car_brand = car_brand.lower() if car_brand else None
     self.prompts = self.load_prompts()
+    with open("formats.json", "r") as file:
+      self.formats = json.load(file)
 
     self.configure_api()
     generation_config = {
@@ -293,6 +295,25 @@ class GeminiInference():
     return response.text
 
   def final_validate_number(self, extracted_number, img_data, predicted_number):
+    #Checking format
+    if self.car_brand in self.formats:
+      brand_format = self.formats[self.car_brand]["format"]
+      number = extracted_number
+
+      normalized_number = number.replace("-", " ")
+
+      number_parts = normalized_number.split()
+      format_parts = list(map(int, brand_format.split("-")))
+
+      if len(number_parts) != len(format_parts):
+        logging.info(f"Final Validator model response: Wrong Format")
+        return "<START>NONE<END>"
+
+      for part, expected_length in zip(number_parts, format_parts):
+        if len(part) != expected_length:
+          logging.info(f"Final Validator model response: Wrong Format")
+          return "<START>NONE<END>"
+
     genai.configure(api_key=self.api_keys[self.current_key_index])
       
     formatted_number = self.format_part_number(extracted_number)
@@ -305,7 +326,6 @@ class GeminiInference():
             }
         },
     ]
-      
 
     prompt = [
         f"Your task is to identify the number {predicted_number} on the provided image. ",
@@ -318,6 +338,7 @@ class GeminiInference():
         "Explanation: [Brief explanation of why it's valid or invalid, including the number itself and any concerns about it being upside-down]",
         "Respond strictly in the format: <START>your_response<END>."
     ]
+
     prompt = "".join(prompt)
 
     prompt_parts = [
@@ -357,11 +378,12 @@ class GeminiInference():
         
         if extracted_number.upper() != "NONE":
             validation_result = self.validate_number(extracted_number, img_data)
-            extracted_number = self.final_validate_number(extracted_number, img_data, extracted_number)
-            if "<VALID>" in validation_result and extracted_number != "NONE": #extracted_number may be "NONE" after final validation
-                logging.info(f"Valid number found: {extracted_number}")
-                self.reset_incorrect_predictions()
-                return extracted_number
+            if "<VALID>" in validation_result:
+                extracted_number = self.final_validate_number(extracted_number, img_data, extracted_number)
+                if extracted_number != "NONE" and extracted_number != "<START>NONE<END>": #extracted_number may be "NONE" after final validation
+                  logging.info(f"Valid number found: {extracted_number}")
+                  self.reset_incorrect_predictions()
+                  return extracted_number
             else:
                 logging.warning(f"Validation failed")
                 self.incorrect_predictions.append(extracted_number)
