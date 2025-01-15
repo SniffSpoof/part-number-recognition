@@ -252,6 +252,22 @@ class GeminiInference():
             formatted_number += f" {number[9:]}"
 
         return formatted_number.strip()
+
+    if self.car_brand == "bmw":
+        number = number.replace('.', '').replace('-', '').replace(' ', '')
+        if re.match(r'^\d{4}\d?\d{6}\d{0,2}$', number):
+          formatted_number = f"{number[:2]}.{number[2:4]} {number[4]} {number[5:8]} {number[8:11]}"
+          
+          if len(number) > 10:
+              if len(number) == 11:
+                  formatted_number = f"{number[:2]}.{number[2:4]} {number[4]} {number[5:8]} {number[8:11]}"
+              elif len(number) > 11:
+                  formatted_number += f" {number[11:]}"
+          
+          return formatted_number.strip()
+        else:
+          return number
+
     else:
         return number
 
@@ -388,7 +404,7 @@ class GeminiInference():
                 if extracted_number != "NONE" and extracted_number != "<START>NONE<END>": #extracted_number may be "NONE" after final validation
                   logging.info(f"Valid number found: {extracted_number}")
                   self.reset_incorrect_predictions()
-                  return extracted_number
+                  return self.format_part_number(extracted_number)
             else:
                 logging.warning(f"Validation failed")
                 self.incorrect_predictions.append(extracted_number)
