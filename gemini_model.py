@@ -297,23 +297,27 @@ class GeminiInference():
   def final_validate_number(self, extracted_number, img_data, predicted_number):
     #Checking format
     if self.car_brand in self.formats:
-      brand_formats = formats[brand]["format"].split(",")
+      brand_formats = self.formats[self.car_brand]["format"].split(",")
       number = extracted_number
 
       normalized_number = number.replace("-", " ")
 
       number_parts = normalized_number.split()
+      flag = True #Extracted number is incorrect in any format
       for brand_format in brand_formats:
         format_parts = list(map(int, brand_format.split("-")))
 
         if len(number_parts) != len(format_parts):
-          logging.info(f"Final Validator model response: Wrong Format")
-          return "<START>NONE<END>"
+          continue
 
         for part, expected_length in zip(number_parts, format_parts):
           if len(part) != expected_length:
-            logging.info(f"Final Validator model response: Wrong Format")
-            return "<START>NONE<END>"
+            continue
+        flag = False
+
+      if flag:
+        logging.info(f"Final Validator model response: Wrong Format")
+        return "<START>NONE<END>"
 
     genai.configure(api_key=self.api_keys[self.current_key_index])
       
