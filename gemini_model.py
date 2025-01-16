@@ -316,7 +316,7 @@ class GeminiInference():
       brand_formats = self.formats[self.car_brand]["format"].split(",")
       number = extracted_number
 
-      normalized_number = number.replace("-", " ")
+      normalized_number = number.replace("-", " ").replace(".", " ")
 
       number_parts = normalized_number.split()
       flag = True #Extracted number is incorrect in any format
