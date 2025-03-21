@@ -220,19 +220,19 @@ class Processor(metaclass=RuntimeMeta):
 
     def parse_images_from_page(self, page_url, max_retries=5):
         """
-        Extract image links from a given page URL, focusing on the "ProductImage__images" class.
-        
+        Extract image links from a given page URL, handling different layouts.
+
         Args:
             page_url (str): The URL of the page to parse.
-        
+
         Returns:
-            list: A list of unique image URLs found within the "ProductImage__images" class.
+            list: A list of unique image URLs found, or an empty list if no images are found.
         """
         logging.info(f"Parsing images from page: {page_url}")
 
         for attempt in range(max_retries):
             headers = random.choice(self.headers_list)
-            
+
             try:
                 time.sleep(random.uniform(1, 2))
                 response = self.session.get(page_url, headers=headers, timeout=15)
@@ -250,24 +250,28 @@ class Processor(metaclass=RuntimeMeta):
                     return []
 
         soup = BeautifulSoup(response.content, 'html.parser')
-        
+
         image_links = []
 
-        # Find images in the "ProductImage__images" class
-        product_image_elements = soup.find_all(class_="ProductImage__images")
-        
-        if product_image_elements:
-            for element in product_image_elements:
-                imgs = element.find_all('img')
-                for img in imgs:
-                    src = img.get('src') or img.get('data-src')
-                    if src:
-                        image_links.append(src)
-            logging.info(f"Found {len(image_links)} images")
-        else:
-            logging.warning("No 'ProductImage__images' class found on the page")
+        # --- Layout 1: Try to find images using ProductImage__images class ---
+        image_container_layout1 = soup.find('ul', class_='ProductImage__images')
+        if image_container_layout1:
+            logging.info("Parsing page with ProductImage__images structure (Layout 1)")
+            image_tags = image_container_layout1.find_all('img')
+            image_links.extend([img.get('src') or img.get('data-src') for img in image_tags if img.get('src') or img.get('data-src')])
+            return image_links  # Return if Layout 1 found
 
-        # Process and clean up image links
+        # --- Layout 2: If ProductImage__images not found, try slick-slider (ivcsLx) ---
+        image_slider_layout2 = soup.find('div', class_='ivcsLx')
+        if image_slider_layout2:
+            logging.info("Parsing page with slick-slider structure (Layout 2)")
+            image_tags = image_slider_layout2.find_all('img', class_='xzFse')
+            image_links.extend([img.get('src') or img.get('data-src') for img in image_tags if img.get('src') or img.get('data-src')])
+            return image_links  # Return if Layout 2 found
+
+        logging.warning("No known image container structure found on the page.")
+
+        # Process and clean up image links (moved outside layout checks, will run if links are found in either layout)
         cleaned_links = []
         for src in image_links:
             if src.startswith('//'):
@@ -278,13 +282,13 @@ class Processor(metaclass=RuntimeMeta):
 
         unique_links = list(set(cleaned_links))
         logging.info(f"Found {len(unique_links)} unique image links")
-        
+
         if not unique_links:
             logging.warning("No images found. Dumping HTML for inspection.")
             with open('page_dump.html', 'w', encoding='utf-8') as f:
                 f.write(soup.prettify())
             logging.warning("HTML dumped to page_dump.html")
-        
+
         return unique_links
 
     def load_product_info(self, url):
